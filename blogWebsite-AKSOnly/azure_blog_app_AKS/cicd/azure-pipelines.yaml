@@ -1,0 +1,45 @@
+trigger:
+- main
+
+stages:
+- stage: Build
+  jobs:
+  - job: Build
+    pool: { vmImage: ubuntu-latest }
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'acr-service-connection'  # create in DevOps
+        repository: 'frontend'
+        command: 'buildAndPush'
+        Dockerfile: '**/frontend/Dockerfile'
+        tags: '$(Build.BuildId),latest'
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'acr-service-connection'
+        repository: 'backend'
+        command: 'buildAndPush'
+        Dockerfile: '**/backend/Dockerfile'
+        tags: '$(Build.BuildId),latest'
+
+- stage: Deploy
+  dependsOn: Build
+  jobs:
+  - job: Deploy
+    pool: { vmImage: ubuntu-latest }
+    steps:
+    - task: KubernetesManifest@0
+      displayName: Deploy k8s
+      inputs:
+        action: deploy
+        kubernetesServiceConnection: 'aks-connection'  # create in DevOps
+        manifests: |
+          k8s/namespace.yaml
+          k8s/frontend.yaml
+          k8s/backend.yaml
+          k8s/ingress.yaml
+          k8s/hpa-frontend.yaml
+          k8s/hpa-backend.yaml
+        containers: |
+          <ACR_LOGIN>/frontend:latest
+          <ACR_LOGIN>/backend:latest

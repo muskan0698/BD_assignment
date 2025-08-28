@@ -1,0 +1,36 @@
+
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: Plan
+  jobs:
+  - job: TerraformPlan
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: '1.6.0'
+
+    - script: |
+        cd infra
+        terraform init
+        terraform plan -out=tfplan
+      displayName: 'Terraform Plan'
+    - publish: infra/tfplan
+      artifact: tfplan
+
+- stage: Apply
+  dependsOn: Plan
+  jobs:
+  - job: TerraformApply
+    steps:
+    - download: current
+      artifact: tfplan
+
+    - script: |
+        cd infra
+        terraform apply "tfplan"
+      displayName: 'Terraform Apply'
